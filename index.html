@@ -99,6 +99,16 @@
   #vidModal video{width:100%;max-height:82vh;border-radius:14px;background:#000;box-shadow:0 12px 50px rgba(0,0,0,.6)}
   #vidModal .vtitle{color:#e9e1d3;font-size:15px;margin:0 0 10px;text-align:center}
   #vidClose{position:absolute;top:-6px;left:0;transform:translateY(-100%);background:rgba(244,239,230,.95);padding:7px 14px}
+  #kitPanel{position:fixed;right:14px;top:74px;z-index:9;display:none;padding:12px 14px;width:min(300px,86vw)}
+  #kitPanel.open{display:block}
+  #kitPanel .hd{display:flex;justify-content:space-between;align-items:center;font-size:14px;margin-bottom:8px}
+  #kitPanel .hd b{color:#ffd9a0}
+  #kitPanel .sw{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #kitPanel .sw button{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:13px;background:rgba(255,255,255,.08);color:#eee;box-shadow:none;text-align:right}
+  #kitPanel .sw button.on{background:#f4efe6;color:#222}
+  #kitPanel .sw i{width:22px;height:22px;border-radius:6px;flex:none;border:1px solid rgba(255,255,255,.4)}
+  #kitClose{padding:4px 10px;font-size:13px}
+  @media (max-width:760px){#kitPanel{top:auto;bottom:60px;right:8px}}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1b1b1b;z-index:10;font-size:18px}
 </style>
 </head>
@@ -116,6 +126,7 @@
   <button id="buildBtn">🏗 שלבי בנייה</button>
   <button id="photoBtn">📷 צילום</button>
   <button id="videoBtn">🎬 סרטון הבנייה</button>
+  <button id="kitBtn">🎨 מטבח</button>
   <button id="muteBtn" title="מוזיקה">🔊</button>
   <div id="levels" class="glass" style="display:none"></div>
   <button id="helpBtn" title="עזרה">?</button>
@@ -132,6 +143,7 @@
   <b>סיור מודרך:</b> כפתור ‹התחל סיור› · Esc לעצירה
 </div>
 <div id="cross"></div>
+<div id="kitPanel" class="glass"><div class="hd"><span>פורניר למטבח: <b id="kitName"></b></span><button id="kitClose">✕</button></div><div class="sw"></div></div>
 <div id="vidModal"><div class="vbox"><button id="vidClose">✕ סגירה</button><div class="vtitle">סרטון הבנייה – Eliezer Hoofien 11</div><video id="vidEl" controls playsinline preload="none" poster="build-poster.jpg"><source src="build-video.mp4" type="video/mp4"></video></div></div>
 <div id="photobar" class="glass"><span>גררו לזווית הרצויה, ואז:</span><button data-ps="0">מגרש חפור</button><button data-ps="1">שלד בטון</button><button data-ps="2">בית גמור</button><button id="psHide">👁 הסתר כפתורים</button><button id="psExit">יציאה</button></div>
 <div id="joy"><div id="knob"></div></div>
@@ -1597,10 +1609,12 @@ const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAtte
    STYLE SWITCH
    ========================================================= */
 function setMetal(m, s) { m.color.setHex(s.c); m.metalness = s.m; m.roughness = s.r; }
+let curStyle = 2, kitchenVeneer = 0;
 function applyStyle(i) {
-  const s = STYLES[i];
+  curStyle = i; const s = STYLES[i];
   M.floor.map = s.floor; M.floor2.map = s.floor2;
-  M.wood.map = s.wood; M.cab.map = s.cab; M.island.map = s.island; M.counter.map = s.counter;
+  M.wood.map = s.wood; M.counter.map = s.counter;
+  if (kitchenVeneer === 0) { M.cab.map = s.cab; M.island.map = s.island; }
   M.splash.color.setHex(s.splash);
   M.wall.color.setHex(s.wall); M.accent.color.setHex(s.accent);
   M.sofa.map = s.sofaMap === 'boucle' ? T.boucle : T.linen; M.sofa.color.setHex(s.sofa);
@@ -2480,6 +2494,51 @@ document.getElementById('wVideo').addEventListener('click', e => { e.stopPropaga
 document.getElementById('vidClose').addEventListener('click', e => { e.stopPropagation(); closeVideo(); });
 vidModal.addEventListener('click', e => { if (e.target === vidModal) closeVideo(); });
 addEventListener('keydown', e => { if (e.code === 'Escape' && vidModal.classList.contains('open')) closeVideo(); });
+/* ===== KITCHEN VENEER OPTIONS – try different wood veneers on the kitchen cabinets and island ===== */
+const VENEERS = [
+  { name: 'ירוק (נוכחי)', sw: '#58644a' },
+  { name: 'אלון בהיר', base: '#cfae84', grain: '130,95,58', sw: '#cfae84' },
+  { name: 'אלון טבעי', base: '#b08351', grain: '95,60,28', sw: '#b08351' },
+  { name: 'אלון אפור', base: '#a69d90', grain: '85,78,68', sw: '#a69d90' },
+  { name: 'טיק', base: '#9b6a3f', grain: '60,35,15', sw: '#9b6a3f' },
+  { name: 'אלון מעושן', base: '#6e5440', grain: '38,26,16', sw: '#6e5440' },
+  { name: 'אגוז אמריקאי', base: '#5a3a26', grain: '28,14,6', sw: '#5a3a26' }
+];
+const veneerTex = {};
+function veneerMaps(i) {
+  if (!veneerTex[i]) { const v = VENEERS[i]; veneerTex[i] = { cab: cabTex(v.base, 'rgba(25,15,8,.45)', null, v.grain), island: flutedTex(v.base, v.grain) }; }
+  return veneerTex[i];
+}
+function applyKitchen(i) {
+  kitchenVeneer = i;
+  if (i === 0) { M.cab.map = STYLES[curStyle].cab; M.island.map = STYLES[curStyle].island; }
+  else { const t = veneerMaps(i); M.cab.map = t.cab; M.island.map = t.island; }
+  M.cab.needsUpdate = M.island.needsUpdate = true;
+  for (const b of document.querySelectorAll('#kitPanel [data-kv]')) b.classList.toggle('on', +b.dataset.kv === i);
+  document.getElementById('kitName').textContent = VENEERS[i].name;
+  dirty = true; envDirty = true;
+}
+{
+  const p = document.getElementById('kitPanel'), row = document.querySelector('#kitPanel .sw');
+  VENEERS.forEach((v, i) => {
+    const b = document.createElement('button'); b.dataset.kv = i; b.title = v.name;
+    b.innerHTML = `<i style="background:${v.sw}"></i><span>${v.name}</span>`; row.appendChild(b);
+  });
+  p.addEventListener('click', e => {
+    e.stopPropagation(); const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.kv) applyKitchen(+b.dataset.kv); else if (b.id === 'kitClose') p.classList.remove('open');
+  });
+  document.getElementById('kitBtn').addEventListener('click', e => {
+    e.stopPropagation();
+    if (p.classList.toggle('open')) {
+      if (tour.active) stopTour(); if (build.active) stopBuild();
+      if (mode !== 'fp') setMode('fp');
+      feet = 0; setActiveLevel(1); camera.position.set(6.7, EYE, 7.6); camera.rotation.set(-0.12, yawTo(9.6 - 6.7, 4.6 - 7.6), 0, 'YXZ');
+      tTarget = 0.4; slider.value = 400; dirty = true;
+    }
+  });
+  applyKitchen(0);
+}
 document.getElementById('photoBtn').addEventListener('click', e => { e.stopPropagation(); photoStart(); });
 photobar.addEventListener('click', e => {
   e.stopPropagation(); const b = e.target.closest('button'); if (!b) return;
