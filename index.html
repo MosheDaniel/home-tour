@@ -93,6 +93,12 @@
   #photobar span{font-size:13px;color:#e9e1d3;padding:0 4px}
   #photobar button.on{background:#b5562e;color:#fff}
   body.photo #topbar,body.photo #timebar,body.photo #room,body.photo #stops,body.photo #tourCard,body.photo #dpad,body.photo #joy,body.photo #cross{display:none!important}
+  #vidModal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.82)}
+  #vidModal.open{display:flex}
+  #vidModal .vbox{position:relative;width:min(1100px,94vw)}
+  #vidModal video{width:100%;max-height:82vh;border-radius:14px;background:#000;box-shadow:0 12px 50px rgba(0,0,0,.6)}
+  #vidModal .vtitle{color:#e9e1d3;font-size:15px;margin:0 0 10px;text-align:center}
+  #vidClose{position:absolute;top:-6px;left:0;transform:translateY(-100%);background:rgba(244,239,230,.95);padding:7px 14px}
   #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1b1b1b;z-index:10;font-size:18px}
 </style>
 </head>
@@ -109,6 +115,7 @@
   <button id="tourBtn">▶ התחל סיור</button>
   <button id="buildBtn">🏗 שלבי בנייה</button>
   <button id="photoBtn">📷 צילום</button>
+  <button id="videoBtn">🎬 סרטון הבנייה</button>
   <button id="muteBtn" title="מוזיקה">🔊</button>
   <div id="levels" class="glass" style="display:none"></div>
   <button id="helpBtn" title="עזרה">?</button>
@@ -125,6 +132,7 @@
   <b>סיור מודרך:</b> כפתור ‹התחל סיור› · Esc לעצירה
 </div>
 <div id="cross"></div>
+<div id="vidModal"><div class="vbox"><button id="vidClose">✕ סגירה</button><div class="vtitle">סרטון הבנייה – Eliezer Hoofien 11</div><video id="vidEl" controls playsinline preload="none" poster="build-poster.jpg"><source src="build-video.mp4" type="video/mp4"></video></div></div>
 <div id="photobar" class="glass"><span>גררו לזווית הרצויה, ואז:</span><button data-ps="0">מגרש חפור</button><button data-ps="1">שלד בטון</button><button data-ps="2">בית גמור</button><button id="psHide">👁 הסתר כפתורים</button><button id="psExit">יציאה</button></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="dpad"><button class="u" data-k="f" aria-label="קדימה">▲</button><button class="l" data-k="l" aria-label="פנייה שמאלה">◀</button><button class="r" data-k="r" aria-label="פנייה ימינה">▶</button><button class="d" data-k="b" aria-label="אחורה">▼</button></div>
@@ -142,6 +150,7 @@
       <button class="primary" id="wStart">התחל</button>
       <button class="secondary" id="wFree">הסתובבו בעצמכם</button>
       <button class="secondary" id="wBuild">🏗 שלבי הבנייה</button>
+      <button class="secondary" id="wVideo">🎬 סרטון הבנייה</button>
     </div>
     <div class="credit">Created by: Moshe Daniel</div>
   </div>
@@ -2453,6 +2462,24 @@ function photoEnd() {
   photoOn = false; document.body.classList.remove('photo');
   restoreBuild(); viewLevel = 2; applyView();
 }
+/* ===== construction video (real-looking AI clip) in a popup ===== */
+const vidModal = document.getElementById('vidModal'), vidEl = document.getElementById('vidEl');
+let vidWasMusic = false;
+function openVideo() {
+  if (tour.active) stopTour(); if (build.active) stopBuild(); if (fp.isLocked) fp.unlock();
+  vidModal.classList.add('open');
+  vidWasMusic = !!(audio && !muted); if (vidWasMusic) audio.master.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.2);
+  try { vidEl.currentTime = 0; const p = vidEl.play(); if (p && p.catch) p.catch(() => {}); } catch (_) {}
+}
+function closeVideo() {
+  vidModal.classList.remove('open'); try { vidEl.pause(); } catch (_) {}
+  if (vidWasMusic && audio && !muted) audio.master.gain.setTargetAtTime(MUSIC_VOL, audio.ctx.currentTime, 0.4);
+}
+document.getElementById('videoBtn').addEventListener('click', e => { e.stopPropagation(); openVideo(); });
+document.getElementById('wVideo').addEventListener('click', e => { e.stopPropagation(); closeWelcome(); openVideo(); });
+document.getElementById('vidClose').addEventListener('click', e => { e.stopPropagation(); closeVideo(); });
+vidModal.addEventListener('click', e => { if (e.target === vidModal) closeVideo(); });
+addEventListener('keydown', e => { if (e.code === 'Escape' && vidModal.classList.contains('open')) closeVideo(); });
 document.getElementById('photoBtn').addEventListener('click', e => { e.stopPropagation(); photoStart(); });
 photobar.addEventListener('click', e => {
   e.stopPropagation(); const b = e.target.closest('button'); if (!b) return;
