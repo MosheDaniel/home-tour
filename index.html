@@ -143,7 +143,7 @@
   <b>סיור מודרך:</b> כפתור ‹התחל סיור› · Esc לעצירה
 </div>
 <div id="cross"></div>
-<div id="kitPanel" class="glass"><div class="hd"><span>פורניר למטבח: <b id="kitName"></b></span><button id="kitClose">✕</button></div><div class="sw"></div></div>
+<div id="kitPanel" class="glass"><div class="hd"><span>פורניר למטבח: <b id="kitName"></b><br><small style="color:#cfc6b8">גררו על המסך כדי להסתכל מסביב</small></span><button id="kitClose">✕</button></div><div class="sw"></div></div>
 <div id="vidModal"><div class="vbox"><button id="vidClose">✕ סגירה</button><div class="vtitle">סרטון הבנייה – Eliezer Hoofien 11</div><video id="vidEl" controls playsinline preload="none" poster="build-poster.jpg"><source src="build-video.mp4" type="video/mp4"></video></div></div>
 <div id="photobar" class="glass"><span>גררו לזווית הרצויה, ואז:</span><button data-ps="0">מגרש חפור</button><button data-ps="1">שלד בטון</button><button data-ps="2">בית גמור</button><button id="psHide">👁 הסתר כפתורים</button><button id="psExit">יציאה</button></div>
 <div id="joy"><div id="knob"></div></div>
@@ -1609,7 +1609,7 @@ const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAtte
    STYLE SWITCH
    ========================================================= */
 function setMetal(m, s) { m.color.setHex(s.c); m.metalness = s.m; m.roughness = s.r; }
-let curStyle = 2, kitchenVeneer = 0;
+let curStyle = 2, kitchenVeneer = 0, kitOpen = false;
 function applyStyle(i) {
   curStyle = i; const s = STYLES[i];
   M.floor.map = s.floor; M.floor2.map = s.floor2;
@@ -1740,7 +1740,7 @@ overlay.addEventListener('click', () => {
   try { const r = document.body.requestPointerLock(); if (r && r.catch) r.catch(() => enableDrag()); } catch (e) { enableDrag(); }
   setTimeout(() => { if (!fp.isLocked) enableDrag(); }, 900);
 });
-renderer.domElement.addEventListener('mousedown', e => { if (dragLook && mode === 'fp' && !tour.active) { dragging = true; lastX = e.clientX; lastY = e.clientY; } });
+renderer.domElement.addEventListener('mousedown', e => { if ((dragLook || kitOpen) && mode === 'fp' && !tour.active) { dragging = true; lastX = e.clientX; lastY = e.clientY; } });
 addEventListener('mouseup', () => { dragging = false; });
 addEventListener('mousemove', e => {
   if (!dragging) return;
@@ -1749,7 +1749,7 @@ addEventListener('mousemove', e => {
   camera.rotation.set(rx, ry, 0, 'YXZ'); lastX = e.clientX; lastY = e.clientY; dirty = true;
 });
 fp.addEventListener('lock', () => { overlay.classList.add('hidden'); cross.style.display = 'block'; });
-fp.addEventListener('unlock', () => { cross.style.display = 'none'; if (mode === 'fp' && !dragLook && !tour.active) overlay.classList.remove('hidden'); });
+fp.addEventListener('unlock', () => { cross.style.display = 'none'; if (mode === 'fp' && !dragLook && !tour.active && !kitOpen) overlay.classList.remove('hidden'); });
 
 function setMode(m) {
   mode = m; dirty = true;
@@ -2505,6 +2505,10 @@ const VENEERS = [
   { name: 'אגוז אמריקאי', base: '#5a3a26', grain: '28,14,6', sw: '#5a3a26' }
 ];
 const veneerTex = {};
+function closeKit() {
+  kitOpen = false; document.getElementById('kitPanel').classList.remove('open');
+  if (mode === 'fp' && !dragLook && !tour.active && !fp.isLocked) overlay.classList.remove('hidden');
+}
 function veneerMaps(i) {
   if (!veneerTex[i]) { const v = VENEERS[i]; veneerTex[i] = { cab: cabTex(v.base, 'rgba(25,15,8,.45)', null, v.grain), island: flutedTex(v.base, v.grain) }; }
   return veneerTex[i];
@@ -2526,11 +2530,15 @@ function applyKitchen(i) {
   });
   p.addEventListener('click', e => {
     e.stopPropagation(); const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.kv) applyKitchen(+b.dataset.kv); else if (b.id === 'kitClose') p.classList.remove('open');
+    if (b.dataset.kv) applyKitchen(+b.dataset.kv); else if (b.id === 'kitClose') closeKit();
   });
   document.getElementById('kitBtn').addEventListener('click', e => {
     e.stopPropagation();
-    if (p.classList.toggle('open')) {
+    if (kitOpen) { closeKit(); return; }
+    kitOpen = true; p.classList.add('open');
+    if (fp.isLocked) fp.unlock();               // free the mouse so the colour buttons can be clicked
+    overlay.classList.add('hidden');
+    {
       if (tour.active) stopTour(); if (build.active) stopBuild();
       if (mode !== 'fp') setMode('fp');
       feet = 0; setActiveLevel(1); camera.position.set(6.7, EYE, 7.6); camera.rotation.set(-0.12, yawTo(9.6 - 6.7, 4.6 - 7.6), 0, 'YXZ');
